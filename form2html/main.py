@@ -5,9 +5,9 @@ import pytesseract
 import numpy as np
 from model import model
 
-image_path = "./4.png"
-scale = 50
-line_width = 1
+image_path = "./3.png"
+scale = 100
+line_width = 5
 offset = 1
 enable_ai = 0
 

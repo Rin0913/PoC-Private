@@ -6,7 +6,7 @@ Original Picture:
 ![image](https://github.com/user-attachments/assets/c9db14b4-e4bd-4427-96d4-f001734338e1)
 
 Output:
-![image](https://github.com/user-attachments/assets/fd761c87-6138-4fcb-998c-a883b82b122a)
+![image](https://github.com/user-attachments/assets/03132cc4-f6cb-466b-a6c8-846f8d204901)
 
 ---
 

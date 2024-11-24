@@ -162,7 +162,11 @@ cv2.imwrite("./output.png", image)
 # _, binary_edges = cv2.threshold(edges, 50, 255, cv2.THRESH_BINARY)
 # lines = cv2.HoughLinesP(binary_edges, 1, np.pi / 180, threshold=20, minLineLength=20, maxLineGap=50)
 
-edges = cv2.Canny(image, 50, 150, apertureSize=3)
+blurred = cv2.GaussianBlur(image, (5, 5), 0)
+binary = cv2.adaptiveThreshold(
+	blurred, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 11, 2
+)
+edges = cv2.Canny(binary, 50, 150)
 lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold=20, minLineLength=20, maxLineGap=50)
 
 line_coordinates = []
@@ -229,7 +233,7 @@ if enable_ai:
     ]
     line_coordinates.sort()
 print(line_coordinates, len(line_coordinates))
-# line_coordinates = remove_isolated_lines(line_coordinates)
+line_coordinates = remove_isolated_lines(line_coordinates)
 
 if len(line_coordinates) == 0:
     sys.exit(0)

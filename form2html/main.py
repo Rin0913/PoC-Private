@@ -5,11 +5,17 @@ import pytesseract
 import numpy as np
 from model import model
 
-image_path = "./3.png"
+image_path = "./4.png"
 scale = 100
 line_width = 5
 offset = 1
 enable_ai = 0
+
+def detect_lines(image, canny_threshold1=50, canny_threshold2=200, hough_threshold=100, min_line_length=50, max_line_gap=10):
+    blurred = cv2.GaussianBlur(image, (3, 3), 0)
+    edges = cv2.Canny(blurred, canny_threshold1, canny_threshold2)
+    lines = cv2.HoughLinesP(edges, 1, np.pi/180, hough_threshold, minLineLength=min_line_length, maxLineGap=max_line_gap)
+    return lines
 
 def clean_and_merge_lines(lines, threshold=1):
     cleaned_lines = []
@@ -156,37 +162,8 @@ for box in boxes.splitlines():
 
 cv2.imwrite("./output.png", image)
 
-# grad_x = cv2.Sobel(image, cv2.CV_64F, 1, 0, ksize=3)
-# grad_y = cv2.Sobel(image, cv2.CV_64F, 0, 1, ksize=3)
-# edges = cv2.convertScaleAbs(cv2.magnitude(grad_x, grad_y))
-# _, binary_edges = cv2.threshold(edges, 50, 255, cv2.THRESH_BINARY)
-# lines = cv2.HoughLinesP(binary_edges, 1, np.pi / 180, threshold=20, minLineLength=20, maxLineGap=50)
-
-blurred = cv2.GaussianBlur(image, (5, 5), 0)
-binary = cv2.adaptiveThreshold(
-	blurred, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 11, 2
-)
-edges = cv2.Canny(binary, 50, 150)
-lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold=20, minLineLength=20, maxLineGap=50)
-
+lines = detect_lines(image)
 line_coordinates = []
-records = set()
-
-def error_function(x1, y1, x2, y2, offset=2):
-    offset_lines = set()
-    
-    for dx1 in range(-offset, offset + 1):
-        for dy1 in range(-offset, offset + 1):
-            for dx2 in range(-offset, offset + 1):
-                for dy2 in range(-offset, offset + 1):
-                    new_x1 = x1 + dx1
-                    new_y1 = y1 + dy1
-                    new_x2 = x2 + dx2
-                    new_y2 = y2 + dy2
-                    
-                    offset_lines.add(((new_x1, new_y1), (new_x2, new_y2)))
-    return offset_lines
-
 
 if lines is not None:
     scale = round(max((np.max(lines, axis=0) / scale)[0]))
@@ -200,12 +177,6 @@ if lines is not None:
                 continue
         else:
             continue
-        # flag = 1
-        # if ((x1, y1), (x2, y2)) in records:
-        #     flag = 0
-        # if flag:
-        #     pass
-        records.update(error_function(x1, y1, x2, y2))
         line_coordinates.append(((x1, y1), (x2, y2)))
 else:
     print("No line detected!")
@@ -232,8 +203,8 @@ if enable_ai:
         for line in line_coordinates
     ]
     line_coordinates.sort()
-print(line_coordinates, len(line_coordinates))
 line_coordinates = remove_isolated_lines(line_coordinates)
+print(line_coordinates, len(line_coordinates))
 
 if len(line_coordinates) == 0:
     sys.exit(0)
@@ -260,45 +231,7 @@ for y, row in enumerate(grid_adjacent):
         if x == 0 or x >= grid_width - 1:
             continue
         if cell == 'line':
-            border_styles = set()
-            if grid_adjacent[y][x - 1] == 'line' and grid_adjacent[y][x + 1] == 'line':
-                border_styles.add(border_horizon)
-            if grid_adjacent[y - 1][x] == 'line' and grid_adjacent[y + 1][x] == 'line':
-                border_styles.add(border_vertical)
-            for i in [-1, 1]:
-                if grid_adjacent[y][x + i] == 'line' and grid_adjacent[y + i][x] == 'line':
-                    border_styles.add(border_vertical)
-                    border_styles.add(border_horizon)
-                if grid_adjacent[y + i][x] == 'line' and grid_adjacent[y][x + i] == 'line':
-                    border_styles.add(border_vertical)
-                    border_styles.add(border_horizon)
-                if grid_adjacent[y][x + i] == 'line' and grid_adjacent[y - i][x] == 'line':
-                    border_styles.add(border_vertical)
-                    border_styles.add(border_horizon)
-                if grid_adjacent[y + i][x] == 'line' and grid_adjacent[y][x - i] == 'line':
-                    border_styles.add(border_vertical)
-                    border_styles.add(border_horizon)
-            if grid_adjacent[y][x - 1] == 'line' and grid_adjacent[y][x + 1] == 'line' and \
-               grid_adjacent[y + 1][x] != 'line' and border_vertical in border_styles:
-               border_styles.remove(border_vertical)
-            if grid_adjacent[y + 1][x] == 'line' and grid_adjacent[y - 1][x] == 'line' and \
-               grid_adjacent[y][x + 1] != 'line' and border_horizon in border_styles:
-               border_styles.remove(border_horizon)
-            if (grid_adjacent[y + 1][x] != 'line' and grid_adjacent[y][x + 1] != 'line') and \
-               (grid_adjacent[y - 1][x] == 'line' and grid_adjacent[y][x - 1] == 'line'):
-                border_styles.clear()
-            if (grid_adjacent[y + 1][x] != 'line' and grid_adjacent[y][x - 1] != 'line') and \
-               (grid_adjacent[y - 1][x] == 'line' and grid_adjacent[y][x + 1] == 'line'):
-                if border_vertical in border_styles:
-                    border_styles.remove(border_vertical)
-            if (grid_adjacent[y - 1][x] != 'line' and grid_adjacent[y][x + 1] != 'line') and \
-               (grid_adjacent[y + 1][x] == 'line' and grid_adjacent[y][x - 1] == 'line'):
-                if border_horizon in border_styles:
-                    border_styles.remove(border_horizon)
-
-
-            style = ' '.join(border_styles)
-            html_row += f'<td class="line" style="{style}"></td>'
+            html_row += f'<td class="line"></td>'
         else:
             html_row += '<td><div class="text" contenteditable="true"></div></td>'
     html_row += '</tr>'
@@ -344,48 +277,105 @@ html_content_adjacent = """
     </style>
 </head>
 <body>
-    <table>
+    <table id="graph-table">
         {rows}
     </table>
     <script>
-        document.addEventListener("DOMContentLoaded", function() {{
-            const table = document.querySelector("table");
+        const borderHorizon = 'border-top: 1px solid black;';
+        const borderVertical = 'border-left: 1px solid black;';
 
-            function mergeCells() {{
-                const rows = table.rows;
-                for (let row of rows) {{
-                    let previousCell = null;
-                    let colspan = 1;
+        function updateTableStyles() {{
+            const table = document.getElementById('graph-table');
+            const rows = table.rows;
 
-                    for (let i = 0; i < row.cells.length;) {{
-                        const cell = row.cells[i];
-                        const editableDiv = cell.querySelector(".text");
+            for (let y = 0; y < rows.length; y++) {{
+                const cells = rows[y].cells;
+                for (let x = 0; x < cells.length; x++) {{
+                    const cell = cells[x];
+                    if (!cell.classList.contains('line')) continue;
 
-                        if (!editableDiv || !editableDiv.isContentEditable) {{
-                            previousCell = null;
-                            colspan = 1;
-                            i ++;
-                            continue;
-                        }}
+                    const borderStyles = new Set();
 
-                        if (previousCell) {{
-                            const prevContent = previousCell.querySelector(".text").innerText.trim();
-                            const currentContent = editableDiv.innerText.trim();
-
-                            colspan++;
-                            previousCell.setAttribute("colspan", colspan);
-                            previousCell.setAttribute("style", `max-width: ${{20 * colspan}}px`);
-                            cell.remove();
-                        }} else {{
-                            previousCell = cell;
-                            colspan = 1;
-                            i++;
+                    if (x > 0 && x < cells.length - 1) {{
+                        if (cells[x - 1]?.classList.contains('line') &&
+                            cells[x + 1]?.classList.contains('line')) {{
+                            borderStyles.add(borderHorizon);
                         }}
                     }}
+
+                    if (y > 0 && y < rows.length - 1) {{
+                        if (rows[y - 1]?.cells[x]?.classList.contains('line') &&
+                            rows[y + 1]?.cells[x]?.classList.contains('line')) {{
+                            borderStyles.add(borderVertical);
+                        }}
+                    }}
+
+                    for (const i of [-1, 1]) {{
+                        if (cells[x + i]?.classList.contains('line') &&
+                            rows[y + i]?.cells[x]?.classList.contains('line')) {{
+                            borderStyles.add(borderVertical);
+                            borderStyles.add(borderHorizon);
+                        }}
+                        if (rows[y + i]?.cells[x]?.classList.contains('line') &&
+                            cells[x + i]?.classList.contains('line')) {{
+                            borderStyles.add(borderVertical);
+                            borderStyles.add(borderHorizon);
+                        }}
+                        if (cells[x + i]?.classList.contains('line') &&
+                            rows[y - i]?.cells[x]?.classList.contains('line')) {{
+                            borderStyles.add(borderVertical);
+                            borderStyles.add(borderHorizon);
+                        }}
+                        if (rows[y + i]?.cells[x]?.classList.contains('line') &&
+                            cells[x - i]?.classList.contains('line')) {{
+                            borderStyles.add(borderVertical);
+                            borderStyles.add(borderHorizon);
+                        }}
+                    }}
+
+                    if (cells[x - 1]?.classList.contains('line') &&
+                        cells[x + 1]?.classList.contains('line') &&
+                        !rows[y + 1]?.cells[x]?.classList.contains('line') &&
+                        borderStyles.has(borderVertical)) {{
+                        borderStyles.delete(borderVertical);
+                    }}
+                    if (rows[y + 1]?.cells[x]?.classList.contains('line') &&
+                        rows[y - 1]?.cells[x]?.classList.contains('line') &&
+                        !cells[x + 1]?.classList.contains('line') &&
+                        borderStyles.has(borderHorizon)) {{
+                        	borderStyles.delete(borderHorizon);
+                    }}
+                    if ((!rows[y + 1]?.cells[x]?.classList.contains('line') &&
+                         !cells[x + 1]?.classList.contains('line')) &&
+                        (rows[y - 1]?.cells[x]?.classList.contains('line') &&
+                         cells[x - 1]?.classList.contains('line'))) {{
+                        borderStyles.clear();
+                    }}
+                    if ((!rows[y + 1]?.cells[x]?.classList.contains('line') &&
+                         !cells[x - 1]?.classList.contains('line')) &&
+                        (rows[y - 1]?.cells[x]?.classList.contains('line') &&
+                         cells[x + 1]?.classList.contains('line'))) {{
+                        if (borderStyles.has(borderVertical)) {{
+                            borderStyles.delete(borderVertical);
+                        }}
+                    }}
+                    if ((!rows[y - 1]?.cells[x]?.classList.contains('line') &&
+                         !cells[x + 1]?.classList.contains('line')) &&
+                        (rows[y + 1]?.cells[x]?.classList.contains('line') &&
+                         cells[x - 1]?.classList.contains('line'))) {{
+                        if (borderStyles.has(borderHorizon)) {{
+                            borderStyles.delete(borderHorizon);
+                        }}
+                    }}
+
+                    const style = Array.from(borderStyles).join(' ');
+                    cell.style.cssText = style;
+					console.log(x, y, style);
                 }}
             }}
-            mergeCells();
-        }});
+        }}
+
+        document.addEventListener('DOMContentLoaded', updateTableStyles);
     </script>
 
 </body>
